@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"fmt"
+	"k8s.io/klog/v2"
 )
 
 type CpuMetric struct {
@@ -38,13 +38,10 @@ func (m *CpuMetric) SetMetrics() error {
 func (m *CpuMetric) deleteMetrics() {
 	m.deleteBaseMetrics()
 
-	if ok := currentReplicasGaugeVec.DeleteLabelValues(m.Cluster, m.Hpa, m.App, m.AppCode, m.ProjectCode); !ok {
-		fmt.Printf("unable to delete currentReplicasGaugeVec, metrics: %+v\n", m)
+	if ok := targetCpuValueVec.DeleteLabelValues(m.Cluster, m.Hpa, m.App, m.AppCode, m.ProjectCode); !ok {
+		klog.Warningf("unable to delete currentReplicasGaugeVec, metrics: %+v", m)
 	}
-	if ok := minReplicasGaugeVec.DeleteLabelValues(m.Cluster, m.Hpa, m.App, m.AppCode, m.ProjectCode); !ok {
-		fmt.Printf("unable to delete minReplicasGaugeVec, metrics: %+v\n", m)
-	}
-	if ok := maxReplicasGaugeVec.DeleteLabelValues(m.Cluster, m.Hpa, m.App, m.AppCode, m.ProjectCode); !ok {
-		fmt.Printf("unable to delete maxReplicasGaugeVec, metrics: %+v\n", m)
+	if ok := currentCpuValueVec.DeleteLabelValues(m.Cluster, m.Hpa, m.App, m.AppCode, m.ProjectCode); !ok {
+		klog.Warningf("unable to delete minReplicasGaugeVec, metrics: %+v", m)
 	}
 }
