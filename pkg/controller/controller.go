@@ -95,8 +95,7 @@ func (ctrl *Controller) Reconcile(req api.WrapNamespacedName) (requeue api.NeedR
 	tr.Step("GetClientWithClusterName")
 
 	hpa := &v2beta2.HorizontalPodAutoscaler{}
-	err = cli.Get(req.NamespacedName, hpa)
-	if err != nil {
+	if err = cli.Get(req.NamespacedName, hpa); err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Warningf("Get cluster %s hpa %s failed: %+v", cli.GetClusterCfgInfo().GetName(), req.String(), err)
 		}

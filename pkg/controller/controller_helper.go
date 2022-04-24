@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/symcn/hparecord/pkg/metrics"
 	"k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -11,15 +12,30 @@ const (
 )
 
 func handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
+	hpaName := hpa.GetName()
+	app := hpa.GetLabels()["app"]
+	appCode := hpa.GetLabels()["appCode"]
+	projectCode := hpa.GetLabels()["projectCode"]
+
+	if app == "" || appCode == "" || projectCode == "" {
+		klog.Warningf("hpa: %s not included app appcode projectCode label", hpaName)
+		return nil
+	}
+
+	var minReplicas int32
+	if hpa.Spec.MinReplicas != nil {
+		minReplicas = *hpa.Spec.MinReplicas
+	}
+
 	for _, metric := range hpa.Spec.Metrics {
 		metadata := metrics.NewMetadata(
 			cluster,
-			hpa.GetName(),
-			hpa.GetLabels()["app"],
-			hpa.GetLabels()["appCode"],
-			hpa.GetLabels()["projectCode"],
+			hpaName,
+			app,
+			appCode,
+			projectCode,
 			hpa.Status.CurrentReplicas,
-			*hpa.Spec.MinReplicas,
+			minReplicas,
 			hpa.Spec.MaxReplicas,
 		)
 		// todo support qps
@@ -27,8 +43,7 @@ func handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 		case v2beta2.ResourceMetricSourceType:
 			switch metric.Resource.Name {
 			case cpuName:
-				err := handleCpuMetrics(metadata, metric, hpa.Status)
-				if err != nil {
+				if err := handleCpuMetrics(metadata, metric, hpa.Status); err != nil {
 					return err
 				}
 			}
@@ -42,11 +57,15 @@ func handleCpuMetrics(metadata *metrics.Metadata, metric v2beta2.MetricSpec, sta
 		targetCpuValue  int32
 		currentCpuValue int32
 	)
-	targetCpuValue = *metric.Resource.Target.AverageUtilization
+	if metric.Resource.Target.AverageUtilization != nil {
+		targetCpuValue = *metric.Resource.Target.AverageUtilization
+	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ResourceMetricSourceType {
 			if m.Resource.Name == cpuName {
-				currentCpuValue = *m.Resource.Current.AverageUtilization
+				if m.Resource.Current.AverageUtilization != nil {
+					currentCpuValue = *m.Resource.Current.AverageUtilization
+				}
 			}
 		}
 	}
