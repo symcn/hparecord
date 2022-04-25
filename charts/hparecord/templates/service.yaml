@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hparecord.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hparecord.labels" . | nindent 4 }}
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: {{ .Values.image.httpPort }}
+  selector:
+      {{- include "hparecord.selectorLabels" . | nindent 8 }}
+  type: ClusterIP

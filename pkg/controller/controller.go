@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"k8s.io/api/autoscaling/v2beta2"
 	"sync"
 	"time"
 
@@ -12,18 +13,7 @@ import (
 	"github.com/symcn/pkg/clustermanager/handler"
 	"github.com/symcn/pkg/clustermanager/predicate"
 	"github.com/symcn/pkg/clustermanager/workqueue"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/trace"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	configmapDataName = "hpaRecord"
 )
 
 type Controller struct {
@@ -31,6 +21,8 @@ type Controller struct {
 
 	api.MultiMingleClient
 	sync.Mutex
+
+	cpuMetricsClient *cpuMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -48,12 +40,21 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	}
 
 	mc, err := cc.New()
+	if err != nil {
+		return nil, err
+	}
+
+	cpuMetricsClient, err := newCpuMetricsClient()
+	if err != nil {
+		return nil, err
+	}
 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
+		cpuMetricsClient:  cpuMetricsClient,
 	}
-	ctrl.registryBeforAfterHandler()
+	ctrl.registryBeforeAfterHandler()
 
 	return ctrl, nil
 }
@@ -62,11 +63,11 @@ func (ctrl *Controller) Start() error {
 	return ctrl.MultiMingleClient.Start(ctrl.ctx)
 }
 
-func (ctrl *Controller) registryBeforAfterHandler() {
-	go startHTTPServer(ctrl.ctx)
+func (ctrl *Controller) registryBeforeAfterHandler() {
+	go startHTTPPrometheus(ctrl.ctx)
 
 	ctrl.RegistryBeforAfterHandler(func(ctx context.Context, cli api.MingleClient) error {
-		queue, err := workqueue.Complted(workqueue.NewWrapQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
+		queue, err := workqueue.Completed(workqueue.NewEventQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
 		if err != nil {
 			return err
 		}
@@ -74,103 +75,68 @@ func (ctrl *Controller) registryBeforAfterHandler() {
 		go queue.Start(ctx)
 
 		cli.AddResourceEventHandler(
-			&corev1.Event{},
+			&v2beta2.HorizontalPodAutoscaler{},
 			handler.NewResourceEventHandler(
 				queue,
-				handler.NewDefaultTransformNamespacedNameEventHandler(),
+				handler.NewEventResourceHandler(),
 				predicate.NamespacePredicate("*"),
-				filterHpaEvent(),
 			),
 		)
-		_, err = cli.GetInformer(&autoscalingv1.HorizontalPodAutoscaler{})
-		if err != nil {
-			return err
-		}
-		_, err = cli.GetInformer(&corev1.ConfigMap{})
-		if err != nil {
-			return err
-		}
 
 		return nil
 	})
 }
 
-func (ctrl *Controller) Reconcile(req api.WrapNamespacedName) (requeue api.NeedRequeue, after time.Duration, err error) {
+func (ctrl *Controller) OnAdd(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
+
 	tr := trace.New("hpa-event-collector",
-		trace.Field{Key: "cluster", Value: req.QName},
-		trace.Field{Key: "namespace", Value: req.Namespace},
-		trace.Field{Key: "name", Value: req.Name},
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
 	)
 	defer tr.LogIfLong(time.Millisecond * 100)
 
-	// get client
-	cli, err := ctrl.GetWithName(req.QName)
-	if err != nil {
+	if err := ctrl.handleMetrics(qname, instance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
-	tr.Step("GetClientWithClusterName")
+	tr.Step("handleMetrics")
 
-	// get event
-	e := &corev1.Event{}
-	err = cli.Get(req.NamespacedName, e)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Warningf("Get cluster %s event %s failed: %+v", cli.GetClusterCfgInfo().GetName(), req.NamespacedName.String(), err)
-		}
-		return api.Done, 0, nil
-	}
-	tr.Step("GetEventWithInformer")
+	return api.Done, 0, nil
+}
 
-	// get hpa
-	hpa := &autoscalingv1.HorizontalPodAutoscaler{}
-	nreq := types.NamespacedName{Namespace: e.InvolvedObject.Namespace, Name: e.InvolvedObject.Name}
-	err = cli.Get(nreq, hpa)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Warningf("Get cluster %s hpa %s failed: %+v", cli.GetClusterCfgInfo().GetName(), nreq.String(), err)
-		}
-		return api.Done, 0, nil
-	}
-	tr.Step("GetHpaWithInformer")
+func (ctrl *Controller) OnUpdate(qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := newObj.(*v2beta2.HorizontalPodAutoscaler)
 
-	data, ok := hpa.Annotations["autoscaling.alpha.kubernetes.io/current-metrics"]
-	if !ok {
-		return api.Done, 0, nil
-	}
+	tr := trace.New("hpa-event-collector",
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
+	)
+	defer tr.LogIfLong(time.Millisecond * 100)
 
-	nreq.Name = nreq.Name + "-hpa-record"
-	notFouncCm := false
-	cm := &corev1.ConfigMap{}
-	err = kube.ManagerPlaneClusterClient.Get(nreq, cm)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Warningf("Get cluster %s configmap %s failed: %+v", cli.GetClusterCfgInfo().GetName(), nreq.String(), err)
-			return api.Done, 0, nil
-		}
-		notFouncCm = true
-		cm = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      nreq.Name,
-				Namespace: nreq.Namespace,
-			},
-			Data: map[string]string{},
-		}
-	}
-	tr.Step("GetConfigmap")
-
-	recordData := kube.BuildAggragageData(cm.Data[configmapDataName], req.QName, data, e.Message)
-	cm.Data[configmapDataName] = recordData
-	if notFouncCm {
-		klog.Infof("Create cluster %s configmap %s", req.QName, nreq.String())
-		err = kube.ManagerPlaneClusterClient.Create(cm, &client.CreateOptions{})
-		tr.Step("CreateConfigmp")
-	} else {
-		klog.Infof("Update cluster %s configmap %s", req.QName, nreq.String())
-		err = kube.ManagerPlaneClusterClient.Update(cm, &client.UpdateOptions{})
-		tr.Step("UpdateConfigmap")
-	}
-	if err != nil {
+	if err := ctrl.handleMetrics(qname, instance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
+	tr.Step("handleMetrics")
+
+	return api.Done, 0, nil
+}
+
+func (ctrl *Controller) OnDelete(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
+
+	tr := trace.New("hpa-event-collector",
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
+	)
+	defer tr.LogIfLong(time.Millisecond * 100)
+
+	if err := ctrl.deleteMetrics(qname, instance); err != nil {
+		return api.Requeue, time.Second * 5, err
+	}
+	tr.Step("handleMetrics")
+
 	return api.Done, 0, nil
 }
