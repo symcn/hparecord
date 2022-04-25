@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/symcn/hparecord/pkg/metrics"
+	"fmt"
 	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/klog/v2"
 )
@@ -11,14 +11,14 @@ const (
 	cpuName = "cpu"
 )
 
-func handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
+func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
 	app := hpa.GetLabels()["app"]
 	appCode := hpa.GetLabels()["appCode"]
 	projectCode := hpa.GetLabels()["projectCode"]
 
 	if app == "" || appCode == "" || projectCode == "" {
-		klog.Warningf("hpa: %s not included app appcode projectCode label", hpaName)
+		klog.Warningf("hpa: %s does not include label(app appcode projectCode)", hpaName)
 		return nil
 	}
 
@@ -27,36 +27,55 @@ func handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 		minReplicas = *hpa.Spec.MinReplicas
 	}
 
+	label := newLabelMap(cluster, hpaName, app, appCode, projectCode)
+
+	var found bool
 	for _, metric := range hpa.Spec.Metrics {
-		metadata := metrics.NewMetadata(
-			cluster,
-			hpaName,
-			app,
-			appCode,
-			projectCode,
-			hpa.Status.CurrentReplicas,
-			minReplicas,
-			hpa.Spec.MaxReplicas,
-		)
 		// todo support qps
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
 			switch metric.Resource.Name {
 			case cpuName:
-				if err := handleCpuMetrics(metadata, metric, hpa.Status); err != nil {
-					return err
-				}
+				found = true
+				targetCpuValue, currentCpuValue := calCpuMetricValue(metric, hpa.Status)
+				value := newValue(targetCpuValue, currentCpuValue, hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+				ctrl.cpuMetricsClient.setPromMetrics(label, value)
 			}
 		}
+	}
+	if !found {
+		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
 	}
 	return nil
 }
 
-func handleCpuMetrics(metadata *metrics.Metadata, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) error {
-	var (
-		targetCpuValue  int32
-		currentCpuValue int32
-	)
+func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
+	hpaName := hpa.GetName()
+	app := hpa.GetLabels()["app"]
+	appCode := hpa.GetLabels()["appCode"]
+	projectCode := hpa.GetLabels()["projectCode"]
+
+	label := newLabelMap(cluster, hpaName, app, appCode, projectCode)
+
+	var found bool
+	for _, metric := range hpa.Spec.Metrics {
+		// todo support qps
+		switch metric.Type {
+		case v2beta2.ResourceMetricSourceType:
+			switch metric.Resource.Name {
+			case cpuName:
+				found = true
+				ctrl.cpuMetricsClient.deletePromMetrics(label)
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
+	}
+	return nil
+}
+
+func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetCpuValue, currentCpuValue int32) {
 	if metric.Resource.Target.AverageUtilization != nil {
 		targetCpuValue = *metric.Resource.Target.AverageUtilization
 	}
@@ -69,7 +88,5 @@ func handleCpuMetrics(metadata *metrics.Metadata, metric v2beta2.MetricSpec, sta
 			}
 		}
 	}
-
-	cpuMetric := metrics.NewCpuMetric(metadata, targetCpuValue, currentCpuValue)
-	return cpuMetric.SetMetrics()
+	return targetCpuValue, currentCpuValue
 }

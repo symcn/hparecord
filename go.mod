@@ -3,13 +3,11 @@ module github.com/symcn/hparecord
 go 1.18
 
 require (
-	github.com/prometheus/client_golang v1.12.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/symcn/api v0.0.0-20220415082853-88bceb086af6
-	github.com/symcn/pkg v0.0.0-20220415093511-230cc81732c4
+	github.com/symcn/api v0.0.0-20220424064502-d5730c43c777
+	github.com/symcn/pkg v0.0.0-20220424080640-2423fa84c820
 	k8s.io/api v0.23.5
-	k8s.io/apimachinery v0.23.5
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.11.2
@@ -55,6 +53,7 @@ require (
 	github.com/oam-dev/cluster-gateway v1.3.2 // indirect
 	github.com/openshift/library-go v0.0.0-20220112153822-ac82336bd076 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.33.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
@@ -91,6 +90,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/apiextensions-apiserver v0.23.5 // indirect
+	k8s.io/apimachinery v0.23.5 // indirect
 	k8s.io/apiserver v0.23.5 // indirect
 	k8s.io/client-go v0.23.5 // indirect
 	k8s.io/component-base v0.23.5 // indirect

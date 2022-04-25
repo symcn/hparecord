@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"github.com/symcn/hparecord/pkg/metrics"
 	"k8s.io/api/autoscaling/v2beta2"
 	"sync"
 	"time"
@@ -14,8 +13,6 @@ import (
 	"github.com/symcn/pkg/clustermanager/handler"
 	"github.com/symcn/pkg/clustermanager/predicate"
 	"github.com/symcn/pkg/clustermanager/workqueue"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/trace"
 )
 
@@ -24,6 +21,8 @@ type Controller struct {
 
 	api.MultiMingleClient
 	sync.Mutex
+
+	cpuMetricsClient *cpuMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -41,10 +40,19 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	}
 
 	mc, err := cc.New()
+	if err != nil {
+		return nil, err
+	}
+
+	cpuMetricsClient, err := newCpuMetricsClient()
+	if err != nil {
+		return nil, err
+	}
 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
+		cpuMetricsClient:  cpuMetricsClient,
 	}
 	ctrl.registryBeforeAfterHandler()
 
@@ -56,10 +64,10 @@ func (ctrl *Controller) Start() error {
 }
 
 func (ctrl *Controller) registryBeforeAfterHandler() {
-	go metrics.Start(ctrl.ctx)
+	go startHTTPPrometheus(ctrl.ctx)
 
 	ctrl.RegistryBeforAfterHandler(func(ctx context.Context, cli api.MingleClient) error {
-		queue, err := workqueue.Complted(workqueue.NewWrapQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
+		queue, err := workqueue.Completed(workqueue.NewEventQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
 		if err != nil {
 			return err
 		}
@@ -70,7 +78,7 @@ func (ctrl *Controller) registryBeforeAfterHandler() {
 			&v2beta2.HorizontalPodAutoscaler{},
 			handler.NewResourceEventHandler(
 				queue,
-				handler.NewDefaultTransformNamespacedNameEventHandler(),
+				handler.NewEventResourceHandler(),
 				predicate.NamespacePredicate("*"),
 			),
 		)
@@ -79,31 +87,53 @@ func (ctrl *Controller) registryBeforeAfterHandler() {
 	})
 }
 
-func (ctrl *Controller) Reconcile(req api.WrapNamespacedName) (requeue api.NeedRequeue, after time.Duration, err error) {
+func (ctrl *Controller) OnAdd(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
+
 	tr := trace.New("hpa-event-collector",
-		trace.Field{Key: "cluster", Value: req.QName},
-		trace.Field{Key: "namespace", Value: req.Namespace},
-		trace.Field{Key: "name", Value: req.Name},
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
 	)
 	defer tr.LogIfLong(time.Millisecond * 100)
 
-	// get client
-	cli, err := ctrl.GetWithName(req.QName)
-	if err != nil {
+	if err := ctrl.handleMetrics(qname, instance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
-	tr.Step("GetClientWithClusterName")
+	tr.Step("handleMetrics")
 
-	hpa := &v2beta2.HorizontalPodAutoscaler{}
-	if err = cli.Get(req.NamespacedName, hpa); err != nil {
-		if !apierrors.IsNotFound(err) {
-			klog.Warningf("Get cluster %s hpa %s failed: %+v", cli.GetClusterCfgInfo().GetName(), req.String(), err)
-		}
-		return api.Done, 0, nil
+	return api.Done, 0, nil
+}
+
+func (ctrl *Controller) OnUpdate(qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := newObj.(*v2beta2.HorizontalPodAutoscaler)
+
+	tr := trace.New("hpa-event-collector",
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
+	)
+	defer tr.LogIfLong(time.Millisecond * 100)
+
+	if err := ctrl.handleMetrics(qname, instance); err != nil {
+		return api.Requeue, time.Second * 5, err
 	}
-	tr.Step("getHpa")
+	tr.Step("handleMetrics")
 
-	if err := handleMetrics(req.QName, hpa); err != nil {
+	return api.Done, 0, nil
+}
+
+func (ctrl *Controller) OnDelete(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
+
+	tr := trace.New("hpa-event-collector",
+		trace.Field{Key: "cluster", Value: qname},
+		trace.Field{Key: "namespace", Value: instance.Namespace},
+		trace.Field{Key: "name", Value: instance.Name},
+	)
+	defer tr.LogIfLong(time.Millisecond * 100)
+
+	if err := ctrl.deleteMetrics(qname, instance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
 	tr.Step("handleMetrics")
