@@ -8,7 +8,7 @@ image:
   repository: symcn.tencentcloudcr.com/symcn/hparecord
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.1"
+  tag: "v0.1.0"
   httpPort: 8080
   logLevel: 4
 
@@ -34,6 +34,9 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+serviceMonitor:
+  enabled: true
+
 podAnnotations: {}
 
 podSecurityContext: {}
@@ -49,8 +52,8 @@ securityContext: {}
 
 resources:
   limits:
-    cpu: 2
-    memory: 4G
+    cpu: 200m
+    memory: 2G
   requests:
     cpu: 100m
     memory: 128Mi

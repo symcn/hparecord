@@ -1,0 +1,19 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hparecord.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hparecord.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "hparecord.selectorLabels" . | nindent 8 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - path: /metrics
+      port: http
+{{- end }}
