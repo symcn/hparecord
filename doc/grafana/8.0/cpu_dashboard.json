@@ -12,6 +12,12 @@
   "__elements": [],
   "__requires": [
     {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
@@ -22,12 +28,6 @@
       "id": "prometheus",
       "name": "Prometheus",
       "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
     },
     {
       "type": "panel",
@@ -59,7 +59,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1650856170630,
+  "iteration": 1650955656991,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -95,9 +95,6 @@
       },
       "id": 6,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -106,7 +103,8 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "8.4.7",
       "targets": [
@@ -116,14 +114,14 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_min_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_min_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
         }
       ],
       "title": "min_replicas",
-      "type": "stat"
+      "type": "gauge"
     },
     {
       "fieldConfig": {
@@ -157,9 +155,6 @@
       },
       "id": 5,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -168,7 +163,8 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "8.4.7",
       "targets": [
@@ -178,14 +174,14 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_current_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_current_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
         }
       ],
       "title": "current_replicas",
-      "type": "stat"
+      "type": "gauge"
     },
     {
       "fieldConfig": {
@@ -219,9 +215,6 @@
       },
       "id": 7,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -230,7 +223,8 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "8.4.7",
       "targets": [
@@ -240,14 +234,14 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_max_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_max_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
         }
       ],
       "title": "max_replicas",
-      "type": "stat"
+      "type": "gauge"
     },
     {
       "fieldConfig": {
@@ -325,7 +319,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_target_value{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_target_value{cluster=\"$cluster\",app=\"$app\"}",
           "interval": "",
           "legendFormat": "target_cpu",
           "refId": "A"
@@ -336,7 +330,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_current_value{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_current_value{cluster=\"$cluster\",app=\"$app\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "current_cpu",
@@ -423,7 +417,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_current_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_current_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "current_replicas",
@@ -435,7 +429,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_max_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_max_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "hide": false,
           "interval": "",
           "intervalFactor": 2,
@@ -448,7 +442,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cpu_min_replicas{app=\"$app\",appCode=\"$appCode\",projectCode=\"$projectCode\"}",
+          "expr": "cpu_min_replicas{cluster=\"$cluster\",app=\"$app\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "min_replicas",
@@ -510,52 +504,6 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "definition": "label_values(cpu_current_replicas{app=\"$app\"}, appCode)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "appCode",
-        "multi": false,
-        "name": "appCode",
-        "options": [],
-        "query": {
-          "query": "label_values(cpu_current_replicas{app=\"$app\"}, appCode)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "definition": "label_values(cpu_current_replicas{app=\"$app\"}, projectCode)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "projectCode",
-        "multi": false,
-        "name": "projectCode",
-        "options": [],
-        "query": {
-          "query": "label_values(cpu_current_replicas{app=\"$app\"}, projectCode)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
       }
     ]
   },
@@ -567,6 +515,6 @@
   "timezone": "",
   "title": "hpa cpu record",
   "uid": "EoTdOHwnk",
-  "version": 9,
+  "version": 12,
   "weekStart": ""
 }
