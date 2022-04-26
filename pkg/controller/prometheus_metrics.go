@@ -11,13 +11,11 @@ import (
 
 type labelMap map[string]string
 
-func newLabelMap(cluster, hpa, app, appCode, projectCode string) labelMap {
+func newLabelMap(cluster, hpa, app string) labelMap {
 	return map[string]string{
-		"cluster":     cluster,
-		"hpa":         hpa,
-		"app":         app,
-		"appCode":     appCode,
-		"projectCode": projectCode,
+		"cluster": cluster,
+		"hpa":     hpa,
+		"app":     app,
 	}
 }
 
