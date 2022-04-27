@@ -8,17 +8,19 @@ import (
 
 const (
 	// todo support qps
-	cpuName = "cpu"
+	cpuName  = "cpu"
+	appLabel = "app"
 )
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
-	app := hpa.GetLabels()["app"]
-	appCode := hpa.GetLabels()["appCode"]
-	projectCode := hpa.GetLabels()["projectCode"]
 
-	if app == "" || appCode == "" || projectCode == "" {
-		klog.Warningf("hpa: %s does not include label(app appcode projectCode)", hpaName)
+	var app string
+	if len(hpa.GetLabels()) > 0 {
+		app = hpa.GetLabels()[appLabel]
+	}
+	if app == "" {
+		klog.Warningf("hpa: %s does not include label(app)", hpaName)
 		return nil
 	}
 
@@ -27,7 +29,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		minReplicas = *hpa.Spec.MinReplicas
 	}
 
-	label := newLabelMap(cluster, hpaName, app, appCode, projectCode)
+	label := newLabelMap(cluster, hpaName, app)
 
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
@@ -44,18 +46,24 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
+		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
 	}
 	return nil
 }
 
 func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
-	app := hpa.GetLabels()["app"]
-	appCode := hpa.GetLabels()["appCode"]
-	projectCode := hpa.GetLabels()["projectCode"]
 
-	label := newLabelMap(cluster, hpaName, app, appCode, projectCode)
+	var app string
+	if len(hpa.GetLabels()) > 0 {
+		app = hpa.GetLabels()[appLabel]
+	}
+	if app == "" {
+		klog.Warningf("hpa: %s does not include label(app)", hpaName)
+		return nil
+	}
+
+	label := newLabelMap(cluster, hpaName, app)
 
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
@@ -70,7 +78,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
+		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
 	}
 	return nil
 }
