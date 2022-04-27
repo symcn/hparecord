@@ -52,7 +52,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1650963716629,
+  "iteration": 1651063542809,
   "links": [],
   "panels": [
     {
@@ -88,13 +88,13 @@
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "last"
           ],
           "fields": "",
           "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": false
       },
       "pluginVersion": "7.0.3",
       "targets": [
@@ -143,19 +143,20 @@
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "last"
           ],
           "fields": "",
           "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": false
       },
       "pluginVersion": "7.0.3",
       "targets": [
         {
           "expr": "cpu_current_replicas{cluster=\"$cluster\",app=\"$app\"}",
-          "interval": "",
+          "format": "time_series",
+          "interval": "1",
           "legendFormat": "",
           "refId": "A"
         }
@@ -198,7 +199,7 @@
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "last"
           ],
           "fields": "",
           "values": false
@@ -483,7 +484,7 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -502,5 +503,5 @@
   "timezone": "",
   "title": "cpu-hpa-record",
   "uid": "c4XWmLw7z",
-  "version": 3
+  "version": 5
 }
