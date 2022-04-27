@@ -20,7 +20,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = hpa.GetLabels()[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label app", hpaName)
+		klog.Warningf("hpa: %s does not include label(app)", hpaName)
 		return nil
 	}
 
@@ -46,7 +46,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
+		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = hpa.GetLabels()[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label app", hpaName)
+		klog.Warningf("hpa: %s does not include label(app)", hpaName)
 		return nil
 	}
 
@@ -78,7 +78,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no support metrics", hpaName)
+		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
 	}
 	return nil
 }
