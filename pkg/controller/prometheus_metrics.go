@@ -3,20 +3,33 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/symcn/pkg/metrics"
-	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
+
+	"github.com/symcn/pkg/metrics"
+	"k8s.io/klog/v2"
 )
 
-type labelMap map[string]string
+var FilterLabels string
 
-func newLabelMap(cluster, hpa, app string) labelMap {
-	return map[string]string{
-		"cluster": cluster,
-		"hpa":     hpa,
-		"app":     app,
+type promLabels map[string]string
+
+func newPromLabels(cluster string, labels map[string]string) promLabels {
+	if FilterLabels == "" {
+		return promLabels{
+			"cluster": cluster,
+		}
 	}
+
+	s := strings.Split(FilterLabels, ",")
+	result := make(promLabels, len(s))
+	for _, label := range s {
+		newLabel := strings.ReplaceAll(label, "-", "_")
+		result[newLabel] = labels[label]
+	}
+	result["cluster"] = cluster
+
+	return result
 }
 
 type value struct {
