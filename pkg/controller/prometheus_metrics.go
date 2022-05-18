@@ -13,6 +13,8 @@ import (
 var FilterLabels string
 var filterLabelList []string
 
+var clusterLabel = "cluster"
+
 type promLabels map[string]string
 
 func initFilterLabelList() {
@@ -22,20 +24,17 @@ func initFilterLabelList() {
 func newPromLabels(cluster string, labels map[string]string) promLabels {
 	if FilterLabels == "" {
 		return promLabels{
-			"cluster": cluster,
+			clusterLabel: cluster,
 		}
 	}
 
 	result := make(promLabels, len(filterLabelList))
 	for _, label := range filterLabelList {
 		newLabel := strings.ReplaceAll(label, "-", "_")
-		v, ok := labels[label]
-		if !ok {
-			klog.V(2).Infof("labels %v does not contains label: %s", labels, label)
-		}
-		result[newLabel] = v
+		// prometheus metrics label count must immutable
+		result[newLabel] = labels[label]
 	}
-	result["cluster"] = cluster
+	result[clusterLabel] = cluster
 
 	return result
 }
