@@ -2,9 +2,10 @@ package controller
 
 import (
 	"context"
-	"k8s.io/api/autoscaling/v2beta2"
 	"sync"
 	"time"
+
+	"k8s.io/api/autoscaling/v2beta2"
 
 	"github.com/symcn/api"
 	"github.com/symcn/hparecord/pkg/kube"
@@ -65,7 +66,7 @@ func (ctrl *Controller) Start() error {
 
 func (ctrl *Controller) registryBeforeAfterHandler() {
 	go startHTTPPrometheus(ctrl.ctx)
-
+	initFilterLabelList()
 	ctrl.RegistryBeforAfterHandler(func(ctx context.Context, cli api.MingleClient) error {
 		queue, err := workqueue.Completed(workqueue.NewEventQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
 		if err != nil {

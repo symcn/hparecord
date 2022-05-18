@@ -11,8 +11,13 @@ import (
 )
 
 var FilterLabels string
+var filterLabelList []string
 
 type promLabels map[string]string
+
+func initFilterLabelList() {
+	filterLabelList = strings.Split(FilterLabels, ",")
+}
 
 func newPromLabels(cluster string, labels map[string]string) promLabels {
 	if FilterLabels == "" {
@@ -21,11 +26,14 @@ func newPromLabels(cluster string, labels map[string]string) promLabels {
 		}
 	}
 
-	s := strings.Split(FilterLabels, ",")
-	result := make(promLabels, len(s))
-	for _, label := range s {
+	result := make(promLabels, len(filterLabelList))
+	for _, label := range filterLabelList {
 		newLabel := strings.ReplaceAll(label, "-", "_")
-		result[newLabel] = labels[label]
+		v, ok := labels[label]
+		if !ok {
+			klog.V(2).Infof("labels %v does not contains label: %s", labels, label)
+		}
+		result[newLabel] = v
 	}
 	result["cluster"] = cluster
 
