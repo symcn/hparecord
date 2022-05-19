@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+
 	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/klog/v2"
 )
@@ -14,10 +15,11 @@ const (
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
+	labels := hpa.GetLabels()
 
 	var app string
-	if len(hpa.GetLabels()) > 0 {
-		app = hpa.GetLabels()[appLabel]
+	if len(labels) > 0 {
+		app = labels[appLabel]
 	}
 	if app == "" {
 		klog.Warningf("hpa: %s does not include label(app)", hpaName)
@@ -29,7 +31,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		minReplicas = *hpa.Spec.MinReplicas
 	}
 
-	label := newLabelMap(cluster, hpaName, app)
+	promLabels := newPromLabels(cluster, labels)
 
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
@@ -41,7 +43,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 				found = true
 				targetCpuValue, currentCpuValue := calCpuMetricValue(metric, hpa.Status)
 				value := newValue(targetCpuValue, currentCpuValue, hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
-				ctrl.cpuMetricsClient.setPromMetrics(label, value)
+				ctrl.cpuMetricsClient.setPromMetrics(promLabels, value)
 			}
 		}
 	}
@@ -53,17 +55,18 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 
 func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
+	labels := hpa.GetLabels()
 
 	var app string
-	if len(hpa.GetLabels()) > 0 {
-		app = hpa.GetLabels()[appLabel]
+	if len(labels) > 0 {
+		app = labels[appLabel]
 	}
 	if app == "" {
 		klog.Warningf("hpa: %s does not include label(app)", hpaName)
 		return nil
 	}
 
-	label := newLabelMap(cluster, hpaName, app)
+	promLabels := newPromLabels(cluster, labels)
 
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
@@ -73,7 +76,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 			switch metric.Resource.Name {
 			case cpuName:
 				found = true
-				ctrl.cpuMetricsClient.deletePromMetrics(label)
+				ctrl.cpuMetricsClient.deletePromMetrics(promLabels)
 			}
 		}
 	}

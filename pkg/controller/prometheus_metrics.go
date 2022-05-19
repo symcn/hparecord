@@ -3,20 +3,40 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/symcn/pkg/metrics"
-	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
+
+	"github.com/symcn/pkg/metrics"
+	"k8s.io/klog/v2"
 )
 
-type labelMap map[string]string
+var FilterLabels string
+var filterLabelList []string
 
-func newLabelMap(cluster, hpa, app string) labelMap {
-	return map[string]string{
-		"cluster": cluster,
-		"hpa":     hpa,
-		"app":     app,
+var clusterLabel = "cluster"
+
+type promLabels map[string]string
+
+func initFilterLabelList() {
+	filterLabelList = strings.Split(FilterLabels, ",")
+}
+
+func newPromLabels(cluster string, labels map[string]string) promLabels {
+	if FilterLabels == "" {
+		return promLabels{
+			clusterLabel: cluster,
+		}
 	}
+
+	result := make(promLabels, len(filterLabelList))
+	for _, label := range filterLabelList {
+		newLabel := strings.ReplaceAll(label, "-", "_")
+		// prometheus metrics label count must immutable
+		result[newLabel] = labels[label]
+	}
+	result[clusterLabel] = cluster
+
+	return result
 }
 
 type value struct {

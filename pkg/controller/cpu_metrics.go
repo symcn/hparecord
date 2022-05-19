@@ -17,7 +17,7 @@ func newCpuMetricsClient() (*cpuMetricsClient, error) {
 	return &cpuMetricsClient{Metrics: cpuMetrics}, nil
 }
 
-func (cm *cpuMetricsClient) setPromMetrics(label labelMap, value value) {
+func (cm *cpuMetricsClient) setPromMetrics(label promLabels, value value) {
 	cm.GaugeWithLabels("target_value", label).Set(value.TargetValue)
 	cm.GaugeWithLabels("current_value", label).Set(value.CurrentValue)
 	cm.GaugeWithLabels("current_replicas", label).Set(value.CurrentReplicas)
@@ -25,7 +25,7 @@ func (cm *cpuMetricsClient) setPromMetrics(label labelMap, value value) {
 	cm.GaugeWithLabels("min_replicas", label).Set(value.MinReplicas)
 }
 
-func (cm *cpuMetricsClient) deletePromMetrics(label labelMap) {
+func (cm *cpuMetricsClient) deletePromMetrics(label promLabels) {
 	cm.DeleteWithLabels("target_value", label)
 	cm.DeleteWithLabels("current_value", label)
 	cm.DeleteWithLabels("current_replicas", label)
