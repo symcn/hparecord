@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/klog/v2"
 )
@@ -48,7 +46,8 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		return nil
 	}
 	return nil
 }
@@ -81,7 +80,8 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		return fmt.Errorf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		return nil
 	}
 	return nil
 }
