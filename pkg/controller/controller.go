@@ -23,6 +23,7 @@ type Controller struct {
 	api.MultiMingleClient
 	sync.Mutex
 
+	hpaMetricsClient *hpaMetricsClient
 	cpuMetricsClient *cpuMetricsClient
 	qpsMetricsClient *qpsMetricsClient
 }
@@ -46,6 +47,10 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 		return nil, err
 	}
 
+	hpaMetricsClient, err := newHpaMetricsClient()
+	if err != nil {
+		return nil, err
+	}
 	cpuMetricsClient, err := newCpuMetricsClient()
 	if err != nil {
 		return nil, err
@@ -58,6 +63,7 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
+		hpaMetricsClient:  hpaMetricsClient,
 		cpuMetricsClient:  cpuMetricsClient,
 		qpsMetricsClient:  qpsMetricsClient,
 	}

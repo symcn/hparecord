@@ -17,18 +17,12 @@ func newQpsMetricsClient() (*qpsMetricsClient, error) {
 	return &qpsMetricsClient{Metrics: qpsMetrics}, nil
 }
 
-func (c *qpsMetricsClient) setPromMetrics(label promLabels, value value) {
+func (c *qpsMetricsClient) setPromMetrics(label promLabels, value metricsValue) {
 	c.GaugeWithLabels("target_value", label).Set(value.TargetValue)
 	c.GaugeWithLabels("current_value", label).Set(value.CurrentValue)
-	c.GaugeWithLabels("current_replicas", label).Set(value.CurrentReplicas)
-	c.GaugeWithLabels("max_replicas", label).Set(value.MaxReplicas)
-	c.GaugeWithLabels("min_replicas", label).Set(value.MinReplicas)
 }
 
 func (c *qpsMetricsClient) deletePromMetrics(label promLabels) {
 	c.DeleteWithLabels("target_value", label)
 	c.DeleteWithLabels("current_value", label)
-	c.DeleteWithLabels("current_replicas", label)
-	c.DeleteWithLabels("max_replicas", label)
-	c.DeleteWithLabels("min_replicas", label)
 }

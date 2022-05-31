@@ -33,16 +33,19 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 
 	promLabels := newPromLabels(cluster, labels)
 
+	// set hpa base metrics
+	value := newHpaValue(hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+	ctrl.hpaMetricsClient.setPromMetrics(promLabels, value)
+
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
-		// todo support qps
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
 			switch metric.Resource.Name {
 			case cpuName:
 				found = true
 				targetCpuValue, currentCpuValue := calCpuMetricValue(metric, hpa.Status)
-				value := newValue(targetCpuValue, currentCpuValue, hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+				value := newMetricsValue(targetCpuValue, currentCpuValue)
 				ctrl.cpuMetricsClient.setPromMetrics(promLabels, value)
 			}
 		case v2beta2.ExternalMetricSourceType:
@@ -51,7 +54,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 			case qpsName:
 				found = true
 				targetCpuValue, currentCpuValue := calQpsMetricValue(metric, hpa.Status)
-				value := newValue(targetCpuValue, currentCpuValue, hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+				value := newMetricsValue(targetCpuValue, currentCpuValue)
 				ctrl.qpsMetricsClient.setPromMetrics(promLabels, value)
 			}
 		}
@@ -77,6 +80,9 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	}
 
 	promLabels := newPromLabels(cluster, labels)
+
+	// delete hpa base metrics
+	ctrl.hpaMetricsClient.deletePromMetrics(promLabels)
 
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {

@@ -39,21 +39,29 @@ func newPromLabels(cluster string, labels map[string]string) promLabels {
 	return result
 }
 
-type value struct {
-	TargetValue     float64
-	CurrentValue    float64
+type hpaValue struct {
 	CurrentReplicas float64
 	MaxReplicas     float64
 	MinReplicas     float64
 }
 
-func newValue(targetValue, currentValue int64, currentReplicas, maxReplicas, minReplicas int32) value {
-	return value{
-		TargetValue:     float64(targetValue),
-		CurrentValue:    float64(currentValue),
+func newHpaValue(currentReplicas, maxReplicas, minReplicas int32) hpaValue {
+	return hpaValue{
 		CurrentReplicas: float64(currentReplicas),
 		MaxReplicas:     float64(maxReplicas),
 		MinReplicas:     float64(minReplicas),
+	}
+}
+
+type metricsValue struct {
+	TargetValue  float64
+	CurrentValue float64
+}
+
+func newMetricsValue(targetValue, currentValue int64) metricsValue {
+	return metricsValue{
+		TargetValue:  float64(targetValue),
+		CurrentValue: float64(currentValue),
 	}
 }
 
