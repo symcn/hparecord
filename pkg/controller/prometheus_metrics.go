@@ -47,7 +47,7 @@ type value struct {
 	MinReplicas     float64
 }
 
-func newValue(targetValue, currentValue, currentReplicas, maxReplicas, minReplicas int32) value {
+func newValue(targetValue, currentValue int64, currentReplicas, maxReplicas, minReplicas int32) value {
 	return value{
 		TargetValue:     float64(targetValue),
 		CurrentValue:    float64(currentValue),

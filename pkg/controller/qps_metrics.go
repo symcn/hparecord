@@ -5,19 +5,19 @@ import (
 	"github.com/symcn/pkg/metrics"
 )
 
-type cpuMetricsClient struct {
+type qpsMetricsClient struct {
 	api.Metrics
 }
 
-func newCpuMetricsClient() (*cpuMetricsClient, error) {
-	cpuMetrics, err := metrics.NewMetrics(cpuName, nil)
+func newQpsMetricsClient() (*qpsMetricsClient, error) {
+	qpsMetrics, err := metrics.NewMetrics(qpsName, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &cpuMetricsClient{Metrics: cpuMetrics}, nil
+	return &qpsMetricsClient{Metrics: qpsMetrics}, nil
 }
 
-func (c *cpuMetricsClient) setPromMetrics(label promLabels, value value) {
+func (c *qpsMetricsClient) setPromMetrics(label promLabels, value value) {
 	c.GaugeWithLabels("target_value", label).Set(value.TargetValue)
 	c.GaugeWithLabels("current_value", label).Set(value.CurrentValue)
 	c.GaugeWithLabels("current_replicas", label).Set(value.CurrentReplicas)
@@ -25,7 +25,7 @@ func (c *cpuMetricsClient) setPromMetrics(label promLabels, value value) {
 	c.GaugeWithLabels("min_replicas", label).Set(value.MinReplicas)
 }
 
-func (c *cpuMetricsClient) deletePromMetrics(label promLabels) {
+func (c *qpsMetricsClient) deletePromMetrics(label promLabels) {
 	c.DeleteWithLabels("target_value", label)
 	c.DeleteWithLabels("current_value", label)
 	c.DeleteWithLabels("current_replicas", label)
