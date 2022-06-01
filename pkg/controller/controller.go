@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	"github.com/symcn/api"
 	"github.com/symcn/hparecord/pkg/kube"
@@ -119,16 +120,24 @@ func (ctrl *Controller) OnAdd(qname string, obj interface{}) (requeue api.NeedRe
 }
 
 func (ctrl *Controller) OnUpdate(qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
-	instance := newObj.(*v2beta2.HorizontalPodAutoscaler)
+	oldInstance := oldObj.(*v2beta2.HorizontalPodAutoscaler)
+	newInstance := newObj.(*v2beta2.HorizontalPodAutoscaler)
 
 	tr := trace.New("hpa-event-collector",
 		trace.Field{Key: "cluster", Value: qname},
-		trace.Field{Key: "namespace", Value: instance.Namespace},
-		trace.Field{Key: "name", Value: instance.Name},
+		trace.Field{Key: "namespace", Value: newInstance.Namespace},
+		trace.Field{Key: "name", Value: newInstance.Name},
 	)
 	defer tr.LogIfLong(time.Millisecond * 100)
 
-	if err := ctrl.handleMetrics(qname, instance); err != nil {
+	// TODO
+	if !equality.Semantic.DeepEqual(newInstance.Spec.Metrics, oldInstance.Spec.Metrics) {
+		if err := ctrl.deleteMetrics(qname, oldInstance); err != nil {
+			return api.Requeue, time.Second * 5, err
+		}
+	}
+
+	if err := ctrl.handleMetrics(qname, newInstance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
 	tr.Step("handleMetrics")
