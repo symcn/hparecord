@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/autoscaling/v2beta2"
-
 	"github.com/symcn/api"
 	"github.com/symcn/hparecord/pkg/kube"
 	symcnclient "github.com/symcn/pkg/clustermanager/client"
@@ -14,6 +12,7 @@ import (
 	"github.com/symcn/pkg/clustermanager/handler"
 	"github.com/symcn/pkg/clustermanager/predicate"
 	"github.com/symcn/pkg/clustermanager/workqueue"
+	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/utils/trace"
 )
 
@@ -88,7 +87,7 @@ func (ctrl *Controller) registryBeforeAfterHandler() {
 	})
 }
 
-func (ctrl *Controller) OnAdd(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+func (ctrl *Controller) OnAdd(ctx context.Context, qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
 	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
 
 	tr := trace.New("hpa-event-collector",
@@ -106,7 +105,7 @@ func (ctrl *Controller) OnAdd(qname string, obj interface{}) (requeue api.NeedRe
 	return api.Done, 0, nil
 }
 
-func (ctrl *Controller) OnUpdate(qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+func (ctrl *Controller) OnUpdate(ctx context.Context, qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
 	instance := newObj.(*v2beta2.HorizontalPodAutoscaler)
 
 	tr := trace.New("hpa-event-collector",
@@ -124,7 +123,7 @@ func (ctrl *Controller) OnUpdate(qname string, oldObj, newObj interface{}) (requ
 	return api.Done, 0, nil
 }
 
-func (ctrl *Controller) OnDelete(qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
+func (ctrl *Controller) OnDelete(ctx context.Context, qname string, obj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
 	instance := obj.(*v2beta2.HorizontalPodAutoscaler)
 
 	tr := trace.New("hpa-event-collector",
