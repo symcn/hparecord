@@ -26,7 +26,7 @@ type Controller struct {
 
 	hpaMetricsClient *hpaMetricsClient
 	cpuMetricsClient *cpuMetricsClient
-	qpsMetricsClient *qpsMetricsClient
+	qpmMetricsClient *qpmMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -56,7 +56,7 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	if err != nil {
 		return nil, err
 	}
-	qpsMetricsClient, err := newQpsMetricsClient()
+	qpmMetricsClient, err := newQpmMetricsClient()
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 		MultiMingleClient: mc,
 		hpaMetricsClient:  hpaMetricsClient,
 		cpuMetricsClient:  cpuMetricsClient,
-		qpsMetricsClient:  qpsMetricsClient,
+		qpmMetricsClient:  qpmMetricsClient,
 	}
 	ctrl.registryBeforeAfterHandler()
 

@@ -9,7 +9,7 @@ import (
 
 const (
 	cpuName  = "cpu"
-	qpsName  = "qps"
+	qpmName  = "qpm"
 	appLabel = "app"
 )
 
@@ -51,11 +51,11 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsType := externalMetricsType(metric.External.Metric.Name)
 			switch metricsType {
-			case qpsName:
+			case qpmName:
 				found = true
 				targetCpuValue, currentCpuValue := calQpsMetricValue(metric, hpa.Status)
 				value := newMetricsValue(targetCpuValue, currentCpuValue)
-				ctrl.qpsMetricsClient.setPromMetrics(promLabels, value)
+				ctrl.qpmMetricsClient.setPromMetrics(promLabels, value)
 			}
 		}
 	}
@@ -96,9 +96,9 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsType := externalMetricsType(metric.External.Metric.Name)
 			switch metricsType {
-			case qpsName:
+			case qpmName:
 				found = true
-				ctrl.qpsMetricsClient.deletePromMetrics(promLabels)
+				ctrl.qpmMetricsClient.deletePromMetrics(promLabels)
 			}
 		}
 	}
@@ -131,7 +131,7 @@ func calQpsMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAu
 	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ExternalMetricSourceType {
-			if externalMetricsType(m.External.Metric.Name) == qpsName {
+			if externalMetricsType(m.External.Metric.Name) == qpmName {
 				if m.External.Current.AverageValue != nil {
 					currentQpsValue = m.External.Current.AverageValue.Value()
 				}
@@ -143,8 +143,8 @@ func calQpsMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAu
 
 func externalMetricsType(name string) string {
 	// use upper case
-	if strings.Contains(name, strings.ToUpper(qpsName)) {
-		return qpsName
+	if strings.Contains(name, strings.ToUpper(qpmName)) {
+		return qpmName
 	}
 	return ""
 }
