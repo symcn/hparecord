@@ -5,8 +5,8 @@ go 1.18
 require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/symcn/api v0.0.0-20220424064502-d5730c43c777
-	github.com/symcn/pkg v0.0.0-20220424080640-2423fa84c820
+	github.com/symcn/api v0.0.0-20220425085530-54887225fdb2
+	github.com/symcn/pkg v0.0.0-20220602032658-d35f9cebb068
 	k8s.io/api v0.23.5
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9

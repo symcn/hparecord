@@ -10,10 +10,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var FilterLabels string
-var filterLabelList []string
+var (
+	FilterLabels    string
+	filterLabelList []string
 
-var clusterLabel = "cluster"
+	clusterLabel = "cluster"
+)
 
 type promLabels map[string]string
 
