@@ -1,6 +1,6 @@
 IMAGE_REGISTRY_NAME?=symcn.tencentcloudcr.com/symcn
 IMAGE_NAME?=hparecord
-IMAGE_TAG?=v0.1.1
+IMAGE_TAG?=v0.1.2
 NAMESPACE?=sym-admin
 
 docker-build:

@@ -13,6 +13,7 @@ import (
 	"github.com/symcn/pkg/clustermanager/predicate"
 	"github.com/symcn/pkg/clustermanager/workqueue"
 	"k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/utils/trace"
 )
 
@@ -22,7 +23,9 @@ type Controller struct {
 	api.MultiMingleClient
 	sync.Mutex
 
+	hpaMetricsClient *hpaMetricsClient
 	cpuMetricsClient *cpuMetricsClient
+	qpmMetricsClient *qpmMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -44,7 +47,15 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 		return nil, err
 	}
 
+	hpaMetricsClient, err := newHpaMetricsClient()
+	if err != nil {
+		return nil, err
+	}
 	cpuMetricsClient, err := newCpuMetricsClient()
+	if err != nil {
+		return nil, err
+	}
+	qpmMetricsClient, err := newQpmMetricsClient()
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +63,9 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
+		hpaMetricsClient:  hpaMetricsClient,
 		cpuMetricsClient:  cpuMetricsClient,
+		qpmMetricsClient:  qpmMetricsClient,
 	}
 	ctrl.registryBeforeAfterHandler()
 
@@ -106,16 +119,24 @@ func (ctrl *Controller) OnAdd(ctx context.Context, qname string, obj interface{}
 }
 
 func (ctrl *Controller) OnUpdate(ctx context.Context, qname string, oldObj, newObj interface{}) (requeue api.NeedRequeue, after time.Duration, err error) {
-	instance := newObj.(*v2beta2.HorizontalPodAutoscaler)
+	oldInstance := oldObj.(*v2beta2.HorizontalPodAutoscaler)
+	newInstance := newObj.(*v2beta2.HorizontalPodAutoscaler)
 
 	tr := trace.New("hpa-event-collector",
 		trace.Field{Key: "cluster", Value: qname},
-		trace.Field{Key: "namespace", Value: instance.Namespace},
-		trace.Field{Key: "name", Value: instance.Name},
+		trace.Field{Key: "namespace", Value: newInstance.Namespace},
+		trace.Field{Key: "name", Value: newInstance.Name},
 	)
 	defer tr.LogIfLong(time.Millisecond * 100)
 
-	if err := ctrl.handleMetrics(qname, instance); err != nil {
+	// TODO
+	if !equality.Semantic.DeepEqual(newInstance.Spec.Metrics, oldInstance.Spec.Metrics) {
+		if err := ctrl.deleteMetrics(qname, oldInstance); err != nil {
+			return api.Requeue, time.Second * 5, err
+		}
+	}
+
+	if err := ctrl.handleMetrics(qname, newInstance); err != nil {
 		return api.Requeue, time.Second * 5, err
 	}
 	tr.Step("handleMetrics")

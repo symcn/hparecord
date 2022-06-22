@@ -1,13 +1,15 @@
 package controller
 
 import (
+	"strings"
+
 	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/klog/v2"
 )
 
 const (
-	// todo support qps
 	cpuName  = "cpu"
+	qpmName  = "qpm"
 	appLabel = "app"
 )
 
@@ -31,17 +33,29 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 
 	promLabels := newPromLabels(cluster, labels)
 
+	// set hpa base metrics
+	value := newHpaValue(hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+	ctrl.hpaMetricsClient.setPromMetrics(promLabels, value)
+
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
-		// todo support qps
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
 			switch metric.Resource.Name {
 			case cpuName:
 				found = true
 				targetCpuValue, currentCpuValue := calCpuMetricValue(metric, hpa.Status)
-				value := newValue(targetCpuValue, currentCpuValue, hpa.Status.CurrentReplicas, hpa.Spec.MaxReplicas, minReplicas)
+				value := newMetricsValue(targetCpuValue, currentCpuValue)
 				ctrl.cpuMetricsClient.setPromMetrics(promLabels, value)
+			}
+		case v2beta2.ExternalMetricSourceType:
+			metricsType := externalMetricsType(metric.External.Metric.Name)
+			switch metricsType {
+			case qpmName:
+				found = true
+				targetCpuValue, currentCpuValue := calQpsMetricValue(metric, hpa.Status)
+				value := newMetricsValue(targetCpuValue, currentCpuValue)
+				ctrl.qpmMetricsClient.setPromMetrics(promLabels, value)
 			}
 		}
 	}
@@ -67,15 +81,24 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 
 	promLabels := newPromLabels(cluster, labels)
 
+	// delete hpa base metrics
+	ctrl.hpaMetricsClient.deletePromMetrics(promLabels)
+
 	var found bool
 	for _, metric := range hpa.Spec.Metrics {
-		// todo support qps
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
 			switch metric.Resource.Name {
 			case cpuName:
 				found = true
 				ctrl.cpuMetricsClient.deletePromMetrics(promLabels)
+			}
+		case v2beta2.ExternalMetricSourceType:
+			metricsType := externalMetricsType(metric.External.Metric.Name)
+			switch metricsType {
+			case qpmName:
+				found = true
+				ctrl.qpmMetricsClient.deletePromMetrics(promLabels)
 			}
 		}
 	}
@@ -86,18 +109,42 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	return nil
 }
 
-func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetCpuValue, currentCpuValue int32) {
+func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetCpuValue, currentCpuValue int64) {
 	if metric.Resource.Target.AverageUtilization != nil {
-		targetCpuValue = *metric.Resource.Target.AverageUtilization
+		targetCpuValue = int64(*metric.Resource.Target.AverageUtilization)
 	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ResourceMetricSourceType {
 			if m.Resource.Name == cpuName {
 				if m.Resource.Current.AverageUtilization != nil {
-					currentCpuValue = *m.Resource.Current.AverageUtilization
+					currentCpuValue = int64(*m.Resource.Current.AverageUtilization)
 				}
 			}
 		}
 	}
 	return targetCpuValue, currentCpuValue
+}
+
+func calQpsMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetQpsValue, currentQpsValue int64) {
+	if metric.External.Target.AverageValue != nil {
+		targetQpsValue = metric.External.Target.AverageValue.Value()
+	}
+	for _, m := range status.CurrentMetrics {
+		if m.Type == v2beta2.ExternalMetricSourceType {
+			if externalMetricsType(m.External.Metric.Name) == qpmName {
+				if m.External.Current.AverageValue != nil {
+					currentQpsValue = m.External.Current.AverageValue.Value()
+				}
+			}
+		}
+	}
+	return targetQpsValue, currentQpsValue
+}
+
+func externalMetricsType(name string) string {
+	// use upper case
+	if strings.Contains(name, strings.ToUpper(qpmName)) {
+		return qpmName
+	}
+	return ""
 }
