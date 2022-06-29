@@ -8,10 +8,21 @@ import (
 )
 
 const (
-	cpuName  = "cpu"
-	qpmName  = "qpm"
 	appLabel = "app"
+
+	cpuName = "cpu"
 )
+
+var (
+	MetricsKinds   string
+	metricsKindSet = map[string]struct{}{}
+)
+
+func initFilterMetricsKindList() {
+	for _, v := range strings.Split(MetricsKinds, ",") {
+		metricsKindSet[v] = struct{}{}
+	}
+}
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
 	hpaName := hpa.GetName()
@@ -49,20 +60,35 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 				ctrl.cpuMetricsClient.setPromMetrics(promLabels, value)
 			}
 		case v2beta2.ExternalMetricSourceType:
-			metricsType := externalMetricsType(metric.External.Metric.Name)
-			switch metricsType {
-			case qpmName:
-				found = true
-				targetCpuValue, currentCpuValue := calQpsMetricValue(metric, hpa.Status)
-				value := newMetricsValue(targetCpuValue, currentCpuValue)
-				ctrl.qpmMetricsClient.setPromMetrics(promLabels, value)
+			metricsKind := convertMetricsKind(metric.External.Metric.Name)
+			if filterExternalMetricsKind(metricsKind) {
+				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				continue
 			}
+
+			if err := setExternalMetrics(metricsKind, metric, hpa.Status, promLabels); err != nil {
+				return err
+			}
+			found = true
 		}
 	}
 	if !found {
 		klog.Warningf("hpa: %s has no supported metrics", hpaName)
 		return nil
 	}
+	return nil
+}
+
+func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus, labels promLabels) error {
+	targetCpuValue, currentCpuValue := calExternalMetricValue(metricsKind, metric, status)
+	value := newMetricsValue(targetCpuValue, currentCpuValue)
+
+	client, err := newMetricsClient(metricsKind)
+	if err != nil {
+		return err
+	}
+
+	client.setPromMetrics(labels, value)
 	return nil
 }
 
@@ -94,12 +120,16 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 				ctrl.cpuMetricsClient.deletePromMetrics(promLabels)
 			}
 		case v2beta2.ExternalMetricSourceType:
-			metricsType := externalMetricsType(metric.External.Metric.Name)
-			switch metricsType {
-			case qpmName:
-				found = true
-				ctrl.qpmMetricsClient.deletePromMetrics(promLabels)
+			metricsKind := convertMetricsKind(metric.External.Metric.Name)
+			if filterExternalMetricsKind(metricsKind) {
+				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				continue
 			}
+
+			if err := deleteExternalMetrics(metricsKind, promLabels); err != nil {
+				return err
+			}
+			found = true
 		}
 	}
 	if !found {
@@ -109,42 +139,59 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	return nil
 }
 
-func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetCpuValue, currentCpuValue int64) {
+func deleteExternalMetrics(metricsKind string, labels promLabels) error {
+	client, err := newMetricsClient(metricsKind)
+	if err != nil {
+		return err
+	}
+
+	client.deletePromMetrics(labels)
+	return nil
+}
+
+func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetValue, currentValue int64) {
 	if metric.Resource.Target.AverageUtilization != nil {
-		targetCpuValue = int64(*metric.Resource.Target.AverageUtilization)
+		targetValue = int64(*metric.Resource.Target.AverageUtilization)
 	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ResourceMetricSourceType {
 			if m.Resource.Name == cpuName {
 				if m.Resource.Current.AverageUtilization != nil {
-					currentCpuValue = int64(*m.Resource.Current.AverageUtilization)
+					currentValue = int64(*m.Resource.Current.AverageUtilization)
 				}
 			}
 		}
 	}
-	return targetCpuValue, currentCpuValue
+	return targetValue, currentValue
 }
 
-func calQpsMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetQpsValue, currentQpsValue int64) {
+func calExternalMetricValue(metricsKind string, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetValue, currentValue int64) {
 	if metric.External.Target.AverageValue != nil {
-		targetQpsValue = metric.External.Target.AverageValue.Value()
+		targetValue = metric.External.Target.AverageValue.Value()
 	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ExternalMetricSourceType {
-			if externalMetricsType(m.External.Metric.Name) == qpmName {
+			if convertMetricsKind(m.External.Metric.Name) == metricsKind {
 				if m.External.Current.AverageValue != nil {
-					currentQpsValue = m.External.Current.AverageValue.Value()
+					currentValue = m.External.Current.AverageValue.Value()
 				}
 			}
 		}
 	}
-	return targetQpsValue, currentQpsValue
+	return targetValue, currentValue
 }
 
-func externalMetricsType(name string) string {
-	// use upper case
-	if strings.Contains(name, strings.ToUpper(qpmName)) {
-		return qpmName
+// name: s0-QPS, keda generate it
+func convertMetricsKind(name string) string {
+	// use lower case
+	s := strings.Split(name, "-")
+	if len(s) > 1 {
+		return strings.ToLower(s[1])
 	}
 	return ""
+}
+
+func filterExternalMetricsKind(MetricsType string) bool {
+	_, exist := metricsKindSet[MetricsType]
+	return !exist
 }

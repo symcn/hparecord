@@ -12,6 +12,7 @@ image:
   httpPort: 8080
   logLevel: 4
   filterLabels: "app,sym-group,sym-zone"
+  metricsKinds: "qpm,dubbo,mq"
 
 rbac:
   name: hparecord

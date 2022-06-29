@@ -25,7 +25,6 @@ type Controller struct {
 
 	hpaMetricsClient *hpaMetricsClient
 	cpuMetricsClient *cpuMetricsClient
-	qpmMetricsClient *qpmMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -55,17 +54,12 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	if err != nil {
 		return nil, err
 	}
-	qpmMetricsClient, err := newQpmMetricsClient()
-	if err != nil {
-		return nil, err
-	}
 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
 		hpaMetricsClient:  hpaMetricsClient,
 		cpuMetricsClient:  cpuMetricsClient,
-		qpmMetricsClient:  qpmMetricsClient,
 	}
 	ctrl.registryBeforeAfterHandler()
 
@@ -79,6 +73,7 @@ func (ctrl *Controller) Start() error {
 func (ctrl *Controller) registryBeforeAfterHandler() {
 	go startHTTPPrometheus(ctrl.ctx)
 	initFilterLabelList()
+	initFilterMetricsKindList()
 	ctrl.RegistryBeforAfterHandler(func(ctx context.Context, cli api.MingleClient) error {
 		queue, err := workqueue.Completed(workqueue.NewEventQueueConfig(cli.GetClusterCfgInfo().GetName(), ctrl)).NewQueue()
 		if err != nil {

@@ -54,6 +54,7 @@ func main() {
 	cmd.PersistentFlags().StringVarP(&mcc.Options.LeaderElectionID, "leader_election_id", "", mcc.Options.LeaderElectionID, "Set leader election id.")
 	cmd.PersistentFlags().StringVarP(&mcc.Options.LeaderElectionNamespace, "leader_election_ns", "", mcc.Options.LeaderElectionNamespace, "Set leader election namespace.")
 	cmd.PersistentFlags().StringVarP(&controller.FilterLabels, "filter_labels", "", controller.FilterLabels, "filter hpa Labels to metrics labels")
+	cmd.PersistentFlags().StringVarP(&controller.MetricsKinds, "metrics_kinds", "", controller.MetricsKinds, "filter external metrics kind")
 
 	if err := cmd.Execute(); err != nil {
 		klog.Errorf("Execute event exporter failed.")
