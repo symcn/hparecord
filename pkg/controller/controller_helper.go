@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"regexp"
 	"strings"
 
 	"k8s.io/api/autoscaling/v2beta2"
@@ -20,7 +21,8 @@ var (
 
 func initFilterMetricsKindList() {
 	for _, v := range strings.Split(MetricsKinds, ",") {
-		metricsKindSet[v] = struct{}{}
+		strings.ReplaceAll(v, "-", "_")
+		metricsKindSet[strings.ToLower(v)] = struct{}{}
 	}
 }
 
@@ -183,10 +185,13 @@ func calExternalMetricValue(metricsKind string, metric v2beta2.MetricSpec, statu
 
 // name: s0-QPS, keda generate it
 func convertMetricsKind(name string) string {
-	// use lower case
-	s := strings.Split(name, "-")
-	if len(s) > 1 {
-		return strings.ToLower(s[1])
+	reg, _ := regexp.Compile("^s\\d+-(.*)")
+
+	subMatch := reg.FindStringSubmatch(name)
+	if len(subMatch) > 1 {
+		kind := subMatch[1]
+		strings.ReplaceAll(kind, "-", "_")
+		return strings.ToLower(kind)
 	}
 	return ""
 }
