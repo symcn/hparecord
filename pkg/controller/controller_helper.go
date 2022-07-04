@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"k8s.io/api/autoscaling/v2beta2"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -24,6 +25,12 @@ func initFilterMetricsKindList() {
 		strings.ReplaceAll(v, "-", "_")
 		metricsKindSet[strings.ToLower(v)] = struct{}{}
 	}
+}
+
+// filterExternalMetricsKind if external metrics not in metricsKindSet, will not set prometheus metrics
+func filterExternalMetricsKind(MetricsType string) bool {
+	_, exist := metricsKindSet[MetricsType]
+	return !exist
 }
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
@@ -54,13 +61,11 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	for _, metric := range hpa.Spec.Metrics {
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
-			switch metric.Resource.Name {
-			case cpuName:
-				found = true
-				targetCpuValue, currentCpuValue := calCpuMetricValue(metric, hpa.Status)
-				value := newMetricsValue(targetCpuValue, currentCpuValue)
-				ctrl.cpuMetricsClient.setPromMetrics(promLabels, value)
+			err := setResourceMetrics(metric.Resource.Name, metric, hpa.Status, promLabels)
+			if err != nil {
+				return err
 			}
+			found = true
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
@@ -78,19 +83,6 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		klog.Warningf("hpa: %s has no supported metrics", hpaName)
 		return nil
 	}
-	return nil
-}
-
-func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus, labels promLabels) error {
-	targetCpuValue, currentCpuValue := calExternalMetricValue(metricsKind, metric, status)
-	value := newMetricsValue(targetCpuValue, currentCpuValue)
-
-	client, err := newMetricsClient(metricsKind)
-	if err != nil {
-		return err
-	}
-
-	client.setPromMetrics(labels, value)
 	return nil
 }
 
@@ -116,11 +108,10 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	for _, metric := range hpa.Spec.Metrics {
 		switch metric.Type {
 		case v2beta2.ResourceMetricSourceType:
-			switch metric.Resource.Name {
-			case cpuName:
-				found = true
-				ctrl.cpuMetricsClient.deletePromMetrics(promLabels)
+			if err := deleteMetrics(string(metric.Resource.Name), promLabels); err != nil {
+				return err
 			}
+			found = true
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
@@ -128,7 +119,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 				continue
 			}
 
-			if err := deleteExternalMetrics(metricsKind, promLabels); err != nil {
+			if err := deleteMetrics(metricsKind, promLabels); err != nil {
 				return err
 			}
 			found = true
@@ -141,7 +132,36 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 	return nil
 }
 
-func deleteExternalMetrics(metricsKind string, labels promLabels) error {
+// setResourceMetrics calculate resource metric and set prometheus metrics, cpu, memory, and so on
+func setResourceMetrics(resource corev1.ResourceName, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus, labels promLabels) error {
+	targetCpuValue, currentCpuValue := calResourceMetricValue(resource, metric, status)
+	value := newMetricsValue(targetCpuValue, currentCpuValue)
+
+	client, err := newMetricsClient(string(resource))
+	if err != nil {
+		return err
+	}
+
+	client.setPromMetrics(labels, value)
+	return nil
+}
+
+// setExternalMetrics calculate external metric and set prometheus metrics, qps, mq, and so on
+func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus, labels promLabels) error {
+	targetCpuValue, currentCpuValue := calExternalMetricValue(metricsKind, metric, status)
+	value := newMetricsValue(targetCpuValue, currentCpuValue)
+
+	client, err := newMetricsClient(metricsKind)
+	if err != nil {
+		return err
+	}
+
+	client.setPromMetrics(labels, value)
+	return nil
+}
+
+// deleteMetrics delete prometheus metrics
+func deleteMetrics(metricsKind string, labels promLabels) error {
 	client, err := newMetricsClient(metricsKind)
 	if err != nil {
 		return err
@@ -151,13 +171,13 @@ func deleteExternalMetrics(metricsKind string, labels promLabels) error {
 	return nil
 }
 
-func calCpuMetricValue(metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetValue, currentValue int64) {
+func calResourceMetricValue(resource corev1.ResourceName, metric v2beta2.MetricSpec, status v2beta2.HorizontalPodAutoscalerStatus) (targetValue, currentValue int64) {
 	if metric.Resource.Target.AverageUtilization != nil {
 		targetValue = int64(*metric.Resource.Target.AverageUtilization)
 	}
 	for _, m := range status.CurrentMetrics {
 		if m.Type == v2beta2.ResourceMetricSourceType {
-			if m.Resource.Name == cpuName {
+			if m.Resource.Name == resource {
 				if m.Resource.Current.AverageUtilization != nil {
 					currentValue = int64(*m.Resource.Current.AverageUtilization)
 				}
@@ -194,9 +214,4 @@ func convertMetricsKind(name string) string {
 		return strings.ToLower(kind)
 	}
 	return ""
-}
-
-func filterExternalMetricsKind(MetricsType string) bool {
-	_, exist := metricsKindSet[MetricsType]
-	return !exist
 }

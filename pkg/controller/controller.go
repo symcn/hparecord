@@ -24,7 +24,6 @@ type Controller struct {
 	sync.Mutex
 
 	hpaMetricsClient *hpaMetricsClient
-	cpuMetricsClient *cpuMetricsClient
 }
 
 func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, error) {
@@ -50,16 +49,11 @@ func New(ctx context.Context, mcc *symcnclient.MultiClientConfig) (*Controller, 
 	if err != nil {
 		return nil, err
 	}
-	cpuMetricsClient, err := newCpuMetricsClient()
-	if err != nil {
-		return nil, err
-	}
 
 	ctrl := &Controller{
 		ctx:               ctx,
 		MultiMingleClient: mc,
 		hpaMetricsClient:  hpaMetricsClient,
-		cpuMetricsClient:  cpuMetricsClient,
 	}
 	ctrl.registryBeforeAfterHandler()
 
