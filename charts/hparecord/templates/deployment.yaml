@@ -35,6 +35,7 @@ spec:
           - -v={{ .Values.image.logLevel | default 4 }}
           - --sync_period=0
           - --filter_labels={{ .Values.image.filterLabels }}
+          - --metrics_kinds={{ .Values.image.metricsKinds }}
           ports:
             - name: http
               containerPort: {{ .Values.image.httpPort }}

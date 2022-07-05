@@ -1,6 +1,6 @@
 IMAGE_REGISTRY_NAME?=symcn.tencentcloudcr.com/symcn
 IMAGE_NAME?=hparecord
-IMAGE_TAG?=v0.1.2
+IMAGE_TAG?=v0.1.3
 NAMESPACE?=sym-admin
 
 docker-build:
@@ -12,4 +12,4 @@ docker-push:
 	docker push $(IMAGE_REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 
 deploy:
-	helm upgrade --install --force hparecord --namespace ${NAMESPACE} --set image.tag=${IMAGE_TAG},image.pullPolicy="Always" ./charts/hparecord
+	helm upgrade --install hparecord --namespace ${NAMESPACE} --set image.tag=${IMAGE_TAG},image.pullPolicy="Always" ./charts/hparecord
