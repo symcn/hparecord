@@ -11,8 +11,6 @@ import (
 
 const (
 	appLabel = "app"
-
-	cpuName = "cpu"
 )
 
 var (
@@ -137,7 +135,7 @@ func setResourceMetrics(resource corev1.ResourceName, metric v2beta2.MetricSpec,
 	targetCpuValue, currentCpuValue := calResourceMetricValue(resource, metric, status)
 	value := newMetricsValue(targetCpuValue, currentCpuValue)
 
-	client, err := newMetricsClient(string(resource))
+	client, err := newExternalMetricsClient(string(resource))
 	if err != nil {
 		return err
 	}
@@ -151,7 +149,7 @@ func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2
 	targetCpuValue, currentCpuValue := calExternalMetricValue(metricsKind, metric, status)
 	value := newMetricsValue(targetCpuValue, currentCpuValue)
 
-	client, err := newMetricsClient(metricsKind)
+	client, err := newExternalMetricsClient(metricsKind)
 	if err != nil {
 		return err
 	}
@@ -162,7 +160,7 @@ func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2
 
 // deleteMetrics delete prometheus metrics
 func deleteMetrics(metricsKind string, labels promLabels) error {
-	client, err := newMetricsClient(metricsKind)
+	client, err := newExternalMetricsClient(metricsKind)
 	if err != nil {
 		return err
 	}

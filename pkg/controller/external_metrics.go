@@ -10,7 +10,7 @@ type externalMetricsClient struct {
 	api.Metrics
 }
 
-func newMetricsClient(kind string) (*externalMetricsClient, error) {
+func newExternalMetricsClient(kind string) (*externalMetricsClient, error) {
 	m, err := metrics.NewMetrics(kind, nil)
 	if err != nil {
 		return nil, err
@@ -26,4 +26,16 @@ func (c *externalMetricsClient) setPromMetrics(label promLabels, value metricsVa
 func (c *externalMetricsClient) deletePromMetrics(label promLabels) {
 	c.DeleteWithLabels("target_value", label)
 	c.DeleteWithLabels("current_value", label)
+}
+
+type metricsValue struct {
+	TargetValue  float64
+	CurrentValue float64
+}
+
+func newMetricsValue(targetValue, currentValue int64) metricsValue {
+	return metricsValue{
+		TargetValue:  float64(targetValue),
+		CurrentValue: float64(currentValue),
+	}
 }
