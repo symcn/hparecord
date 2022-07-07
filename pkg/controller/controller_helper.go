@@ -203,7 +203,7 @@ func calExternalMetricValue(metricsKind string, metric v2beta2.MetricSpec, statu
 
 // name: s0-QPS, keda generate it
 func convertMetricsKind(name string) string {
-	reg, _ := regexp.Compile("^s\\d+-(.*)")
+	reg, _ := regexp.Compile(`^s\d+-(\w+)`)
 
 	subMatch := reg.FindStringSubmatch(name)
 	if len(subMatch) > 1 {

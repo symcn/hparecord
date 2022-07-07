@@ -18,13 +18,18 @@ func Test_convertMetricsKind(t *testing.T) {
 		},
 		{
 			name: "test-2",
-			args: args{name: "s1-DUBBO-QPM"},
-			want: "dubbo-qpm",
+			args: args{name: "s1-DUBBOQPM"},
+			want: "dubboqpm",
 		},
 		{
 			name: "test-2",
-			args: args{name: "s11111-DUBBO-QPM"},
-			want: "dubbo-qpm",
+			args: args{name: "s11111-DUBBO_QPM"},
+			want: "dubbo_qpm",
+		},
+		{
+			name: "test-2",
+			args: args{name: "s11111-cron-asia-shanghai-30xxxx-45xxxx"},
+			want: "cron",
 		},
 	}
 	for _, tt := range tests {
