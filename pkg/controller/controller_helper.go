@@ -32,7 +32,6 @@ func filterExternalMetricsKind(MetricsType string) bool {
 }
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
-	hpaName := hpa.GetName()
 	labels := hpa.GetLabels()
 
 	var app string
@@ -40,7 +39,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = labels[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label(app)", hpaName)
+		klog.Warningf("hpa: %s/%s does not include label(app)", hpa.Namespace, hpa.Name)
 		return nil
 	}
 
@@ -67,7 +66,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
-				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				klog.Warningf("hpa: %s/%s not supported metrics kind: %s", hpa.Namespace, hpa.Name, metricsKind)
 				continue
 			}
 
@@ -78,14 +77,13 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s/%s has no supported metrics", hpa.Namespace, hpa.Name)
 		return nil
 	}
 	return nil
 }
 
 func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
-	hpaName := hpa.GetName()
 	labels := hpa.GetLabels()
 
 	var app string
@@ -93,7 +91,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = labels[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label(app)", hpaName)
+		klog.Warningf("hpa: %s/%s does not include label(app)", hpa.Namespace, hpa.Name)
 		return nil
 	}
 
@@ -113,7 +111,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
-				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				klog.Warningf("hpa: %s/%s not supported metrics kind: %s", hpa.Namespace, hpa.Name, metricsKind)
 				continue
 			}
 
@@ -124,7 +122,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s/%s has no supported metrics", hpa.Namespace, hpa.Name)
 		return nil
 	}
 	return nil
