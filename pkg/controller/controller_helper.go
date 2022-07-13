@@ -11,8 +11,6 @@ import (
 
 const (
 	appLabel = "app"
-
-	cpuName = "cpu"
 )
 
 var (
@@ -34,7 +32,6 @@ func filterExternalMetricsKind(MetricsType string) bool {
 }
 
 func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
-	hpaName := hpa.GetName()
 	labels := hpa.GetLabels()
 
 	var app string
@@ -42,7 +39,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = labels[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label(app)", hpaName)
+		klog.Warningf("hpa: %s/%s does not include label(app)", hpa.Namespace, hpa.Name)
 		return nil
 	}
 
@@ -69,7 +66,7 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
-				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				klog.Warningf("hpa: %s/%s not supported metrics kind: %s", hpa.Namespace, hpa.Name, metricsKind)
 				continue
 			}
 
@@ -80,14 +77,13 @@ func (ctrl *Controller) handleMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s/%s has no supported metrics", hpa.Namespace, hpa.Name)
 		return nil
 	}
 	return nil
 }
 
 func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPodAutoscaler) error {
-	hpaName := hpa.GetName()
 	labels := hpa.GetLabels()
 
 	var app string
@@ -95,7 +91,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		app = labels[appLabel]
 	}
 	if app == "" {
-		klog.Warningf("hpa: %s does not include label(app)", hpaName)
+		klog.Warningf("hpa: %s/%s does not include label(app)", hpa.Namespace, hpa.Name)
 		return nil
 	}
 
@@ -115,7 +111,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		case v2beta2.ExternalMetricSourceType:
 			metricsKind := convertMetricsKind(metric.External.Metric.Name)
 			if filterExternalMetricsKind(metricsKind) {
-				klog.Warningf("not supported metrics Kind: %s", metricsKind)
+				klog.Warningf("hpa: %s/%s not supported metrics kind: %s", hpa.Namespace, hpa.Name, metricsKind)
 				continue
 			}
 
@@ -126,7 +122,7 @@ func (ctrl *Controller) deleteMetrics(cluster string, hpa *v2beta2.HorizontalPod
 		}
 	}
 	if !found {
-		klog.Warningf("hpa: %s has no supported metrics", hpaName)
+		klog.Warningf("hpa: %s/%s has no supported metrics", hpa.Namespace, hpa.Name)
 		return nil
 	}
 	return nil
@@ -137,7 +133,7 @@ func setResourceMetrics(resource corev1.ResourceName, metric v2beta2.MetricSpec,
 	targetCpuValue, currentCpuValue := calResourceMetricValue(resource, metric, status)
 	value := newMetricsValue(targetCpuValue, currentCpuValue)
 
-	client, err := newMetricsClient(string(resource))
+	client, err := newExternalMetricsClient(string(resource))
 	if err != nil {
 		return err
 	}
@@ -151,7 +147,7 @@ func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2
 	targetCpuValue, currentCpuValue := calExternalMetricValue(metricsKind, metric, status)
 	value := newMetricsValue(targetCpuValue, currentCpuValue)
 
-	client, err := newMetricsClient(metricsKind)
+	client, err := newExternalMetricsClient(metricsKind)
 	if err != nil {
 		return err
 	}
@@ -162,7 +158,7 @@ func setExternalMetrics(metricsKind string, metric v2beta2.MetricSpec, status v2
 
 // deleteMetrics delete prometheus metrics
 func deleteMetrics(metricsKind string, labels promLabels) error {
-	client, err := newMetricsClient(metricsKind)
+	client, err := newExternalMetricsClient(metricsKind)
 	if err != nil {
 		return err
 	}
@@ -205,7 +201,7 @@ func calExternalMetricValue(metricsKind string, metric v2beta2.MetricSpec, statu
 
 // name: s0-QPS, keda generate it
 func convertMetricsKind(name string) string {
-	reg, _ := regexp.Compile("^s\\d+-(.*)")
+	reg, _ := regexp.Compile(`^s\d+-(\w+)`)
 
 	subMatch := reg.FindStringSubmatch(name)
 	if len(subMatch) > 1 {
